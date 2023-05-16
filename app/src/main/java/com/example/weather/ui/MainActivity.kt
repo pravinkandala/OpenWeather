@@ -1,5 +1,6 @@
 package com.example.weather.ui
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,12 +17,19 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.weather.data.WeatherResponse
 import com.example.weather.ui.viewmodel.WeatherViewModel
+import com.example.weather.utils.convertKelvinToFahrenheit
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import java.util.Locale
+import kotlin.math.roundToInt
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,13 +39,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            WeatherApp()
+            WeatherApp(
+                context = baseContext
+            )
         }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun WeatherApp() {
+    fun WeatherApp(context: Context) {
         val weatherData by weatherViewModel.weatherData.observeAsState()
         val error by weatherViewModel.error.observeAsState()
 
@@ -45,7 +55,7 @@ class MainActivity : ComponentActivity() {
             topBar = { WeatherAppBar() },
             content = { padding ->
                 Column(modifier = Modifier.padding(padding)) {
-                        WeatherContent(weatherData, error)
+                        WeatherContent(context, weatherData, error)
                 }
             }
         )
@@ -60,7 +70,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun WeatherContent(weatherData: WeatherResponse?, error: String?) {
+    fun WeatherContent(context: Context, weatherData: WeatherResponse?, error: String?) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -73,7 +83,7 @@ class MainActivity : ComponentActivity() {
             Spacer(modifier = Modifier.height(16.dp))
 
             if (weatherData != null) {
-                WeatherDetails(weatherData)
+                WeatherDetails(context, weatherData)
             } else if (error != null) {
                 Text(text = "Error: $error")
             }
@@ -109,17 +119,36 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun WeatherDetails(weatherData: WeatherResponse) {
-        Column {
+    fun WeatherDetails(context: Context, weatherData: WeatherResponse) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(text = "Location: ${weatherData.name}")
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(text = "Temperature: ${weatherData.main.temp} K")
+            val temperatureInKelvin = weatherData.main.temp
+            val temperatureInFahrenheit = convertKelvinToFahrenheit(temperatureInKelvin)
+
+            Text(text = "Temperature: ${temperatureInFahrenheit.roundToInt()} °F")
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(text = "Description: ${weatherData.weather[0].description}")
+            weatherData.weather.forEach { weather ->
+                val weatherDescription = weather.description
+                val weatherIconUrl = "https://openweathermap.org/img/wn/${weather.icon}@2x.png"
+
+                Text(text = weatherDescription.uppercase(Locale.getDefault()), modifier = Modifier.padding(bottom = 16.dp))
+
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(weatherIconUrl)
+                        .build(),
+                    contentDescription = weather.description,
+                    modifier = Modifier.size(64.dp)
+                )
+            }
         }
     }
 }
